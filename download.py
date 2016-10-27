@@ -8,38 +8,43 @@ import bs4 as BeautifulSoup
 
 def download_pdf(link, location, name):
     try:
-        response = urllib2.urlopen(link)
-        file = open(os.path.join(location, name), 'w')
-        file.write(response.read())
-        file.close()
+        fname = os.path.join(location, name)
+        if not os.path.isfile(fname):
+            file = open(fname, 'w')
+            response = urllib2.urlopen(link)
+            file.write(response.read())
+            file.close()
     except urllib2.HTTPError:
-        print('>>> Error 404: cannot be downloaded!\n') 
-        raise   
+        print('>>> Error 404: cannot be downloaded!\n')
+        raise
+    except IOError as e:
+        print('>>> IO Error')
+        raise
 
 def clean_pdf_link(link):
     if 'arxiv' in link:
-        link = link.replace('abs', 'pdf')   
+        link = link.replace('abs', 'pdf')
         if not(link.endswith('.pdf')):
             link = '.'.join((link, 'pdf'))
     if 'github' in link:
-        link = '.'.join((link, 'html'))        
+        link = '.'.join((link, 'html'))
     return link
 
 def clean_text(text, replacements = {' ': '_', '/': '_', '.': '', '"': ''}):
     for key, rep in replacements.items():
         text = text.replace(key, rep)
-    return text    
+    return text
 
 def print_title(title, pattern = "-"):
-    print('\n'.join(("", title, pattern * len(title)))) 
+    print('\n'.join(("", title, pattern * len(title))))
 
 def get_extension(link):
     extension = os.path.splitext(link)[1][1:]
     if extension in ['pdf', 'html']:
         return extension
     if 'pdf' in extension:
-        return 'pdf'    
-    return 'pdf'    
+        return 'pdf'
+    return 'pdf'
 
 def shorten_title(title):
     m1 = re.search('[[0-9]*]', title)
@@ -47,8 +52,8 @@ def shorten_title(title):
     if m1:
         title = m1.group(0)
     if m2:
-        title = ' '.join((title, m2.group(0)))   
-    return title[:50] + ' [...]'    
+        title = ' '.join((title, m2.group(0)))
+    return title[:50] + ' [...]'
 
 
 if __name__ == '__main__':
@@ -56,7 +61,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Download all the PDF/HTML links into README.md')
     parser.add_argument('-d', action="store", dest="directory")
     parser.add_argument('--no-html', action="store_true", dest="nohtml", default = False)
-    parser.add_argument('--overwrite', action="store_true", default = False)    
+    parser.add_argument('--overwrite', action="store_true", default = False)
     results = parser.parse_args()
 
     output_directory = 'pdfs' if results.directory is None else results.directory
@@ -80,8 +85,9 @@ if __name__ == '__main__':
                     h1_directory = os.path.join(output_directory, clean_text(point.text))
                     current_directory = h1_directory
                 elif point.name == 'h2':
-                    current_directory = os.path.join(h1_directory, clean_text(point.text))  
-                os.makedirs(current_directory)
+                    current_directory = os.path.join(h1_directory, clean_text(point.text))
+                if not os.path.isdir(current_directory):
+                    os.makedirs(current_directory)
                 print_title(point.text)
 
             if point.name == 'p':
@@ -94,10 +100,10 @@ if __name__ == '__main__':
                         try:
                             name = clean_text(point.text.split('[' + ext + ']')[0])
                             download_pdf(link, current_directory, '.'.join((name, ext)))
-                        except:
+                        except IOError:
                             failures.append(point.text)
-                        
-        point = point.next_sibling          
+
+        point = point.next_sibling
 
     print('Done!')
     if failures:
